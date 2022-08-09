@@ -2,7 +2,7 @@ import * as ts from "typescript";
 
 import { toNode } from "../utils";
 
-import { undefined as undefined_ } from "./primitives";
+import { never, undefined as undefined_ } from "./primitives";
 
 export * from "./primitives";
 
@@ -21,7 +21,7 @@ export interface TypeDefinitionObject {
 	[K: string]: TypeDefinition;
 }
 
-export type TypeDefinition = TypeReferenceLike | TypeDefinitionObject | TypeDefinitionPlain;
+export type TypeDefinition = TypeReferenceLike | TypeDefinitionObject | TypeDefinitionPlain | _self;
 
 /**
  * "interface" is a reserved keyword.
@@ -43,9 +43,14 @@ function interface_(name: string, properties: TypeDefinitionObject): ts.Interfac
 		undefined,
 		undefined,
 		Object.entries(properties).map(([key, node]) => {
-			return property(key, node);
+			return property(key, node, name);
 		})
 	);
+}
+
+class _self {}
+export function self() {
+	return new _self()
 }
 
 export interface ModuleOptions {
@@ -182,8 +187,8 @@ export function comment(definition: TypeDefinition, value: string | Array<string
  * @param name The property name.
  * @param definition The type definition.
  */
-export function property(name: string, definition: TypeDefinition): ts.PropertySignature {
-	const node = toNode(definition);
+export function property(name: string, definition: TypeDefinition, parent?: string): ts.PropertySignature {
+	const node = toNode(definition instanceof _self ? !!parent ? reference(parent) : never() : definition);
 
 	const optional = ts.isUnionTypeNode(node)
 		? node.types.find((value) => value.kind === ts.SyntaxKind.UndefinedKeyword) &&
@@ -240,7 +245,7 @@ export function optional(definition: TypeDefinition) {
 export function tuple(definitions: Array<TypeDefinition>): ts.TupleTypeNode;
 /**
  * Create a named tuple from an definition object.
- * @param definitions An object, with the property keys used as the tuple entry name.
+ * @param definitions An object, with the property keys used as the tuple entry name.pr
  */
 export function tuple(definitions: Record<string, TypeDefinition>): ts.TupleTypeNode;
 export function tuple(
